@@ -1,0 +1,8 @@
+github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
+github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
+github.com/jxskiss/base62 v1.1.0 h1:A5zbF8v8WXx2xixnAKD2w+abC+sIzYJX+nxmhA6HWFw=
+github.com/jxskiss/base62 v1.1.0/go.mod h1:HhWAlUXvxKThfOlZbcuFzsqwtF5TcqS9ru3y5GfjWAc=
+github.com/martinlindhe/base36 v1.1.0 h1:cIwvvwYse/0+1CkUPYH5ZvVIYG3JrILmQEIbLuar02Y=
+github.com/martinlindhe/base36 v1.1.0/go.mod h1:+AtEs8xrBpCeYgSLoY/aJ6Wf37jtBuR0s35750M27+8=
+github.com/speps/go-hashids/v2 v2.0.1 h1:ViWOEqWES/pdOSq+C1SLVa8/Tnsd52XC34RY7lt7m4g=
+github.com/speps/go-hashids/v2 v2.0.1/go.mod h1:47LKunwvDZki/uRVD6NImtyk712yFzIs3UF3KlHohGw=
