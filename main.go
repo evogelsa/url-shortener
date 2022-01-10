@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"text/template"
 
 	"github.com/gorilla/mux"
 	"github.com/jxskiss/base62"
@@ -21,6 +22,10 @@ var (
 	links   map[string]string
 	counter int64
 )
+
+type ExtraData struct {
+	Extra string
+}
 
 // check for saved links and load or create
 func init() {
@@ -111,26 +116,10 @@ func newID() string {
 }
 
 func home(w http.ResponseWriter, r *http.Request) {
-	content := `<!doctype html>
-	<html lang="en">
-	  <head>
-		<meta charset="utf-8">
-		<link rel="stylesheet" href="/static/styles.css">
-	  </head>
-	  <body>
-		<h1 id="shorten-url">Shorten URL</h1>
-		<div>
-		<form action="/" method="post" name="shorten" autocomplete="off">
-		<p><label for="url">URL</label> <input type="text" id="url" name="url" width="100%" margin-top="6px" margin-bottom="16px" required></p>
-		<p><label for="custom">Custom alias</label> <input type="text" id="custom" name="custom" width="100%" margin-top="6px" margin-bottom="16px"></p>
-		<input type="submit" name="send" value="Submit">
-		</form>
-		</div>
-	  </body>
-	</html>
-	`
+	tmpl := template.Must(template.ParseFiles("create.html"))
+	extra := ExtraData{Extra: ""}
 
-	fmt.Fprint(w, content)
+	tmpl.Execute(w, extra)
 }
 
 func create(w http.ResponseWriter, r *http.Request) {
@@ -148,55 +137,23 @@ func create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, exists := links[id]; exists {
-		content := `<!doctype html>
-		<html lang="en">
-		  <head>
-			<meta charset="utf-8">
-			<link rel="stylesheet" href="/static/styles.css">
-		  </head>
-		  <body>
-			<h1 id="shorten-url">Shorten URL</h1>
-			<div>
-			<form action="/" method="post" name="shorten" autocomplete="off">
-			<p><label for="url">URL</label> <input type="text" id="url" name="url" width="100%" margin-top="6px" margin-bottom="16px" required></p>
-			<p><label for="custom">Custom alias</label> <input type="text" id="custom" name="custom" width="100%" margin-top="6px" margin-bottom="16px"></p>
-			<input type="submit" name="send" value="Submit">
-			</form>
-			</div>
-			<div>
-			Alias already in use
-			</div>
-		  </body>
-		</html>`
+		tmpl := template.Must(template.ParseFiles("create.html"))
+		extra := ExtraData{
+			Extra: `<p style="color: #d50000">Sorry, that alias is in use!<p>`,
+		}
 
-		fmt.Fprintf(w, content, id)
+		tmpl.Execute(w, extra)
 		return
 	}
 
 	_, err = url.ParseRequestURI(uri)
 	if err != nil {
-		content := `<!doctype html>
-		<html lang="en">
-		  <head>
-			<meta charset="utf-8">
-			<link rel="stylesheet" href="/static/styles.css">
-		  </head>
-		  <body>
-			<h1 id="shorten-url">Shorten URL</h1>
-			<div>
-			<form action="/" method="post" name="shorten" autocomplete="off">
-			<p><label for="url">URL</label> <input type="text" id="url" name="url" width="100%" margin-top="6px" margin-bottom="16px" required></p>
-			<p><label for="custom">Custom alias</label> <input type="text" id="custom" name="custom" width="100%" margin-top="6px" margin-bottom="16px"></p>
-			<input type="submit" name="send" value="Submit">
-			</form>
-			</div>
-			<div>
-			Not a valid URL
-			</div>
-		  </body>
-		</html>`
+		tmpl := template.Must(template.ParseFiles("create.html"))
+		extra := ExtraData{
+			Extra: `<p style="color: #d50000">That is not a valid URL!<p>`,
+		}
 
-		fmt.Fprintf(w, content, id)
+		tmpl.Execute(w, extra)
 		return
 	}
 
@@ -218,28 +175,14 @@ func create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	link := fmt.Sprintf("https://ethans.link/%s", id)
-	content := `<!doctype html>
-	<html lang="en">
-	  <head>
-		<meta charset="utf-8">
-		<link rel="stylesheet" href="/static/styles.css">
-	  </head>
-	  <body>
-		<h1 id="shorten-url">Shorten URL</h1>
-		<div>
-		<form action="/" method="post" name="shorten" autocomplete="off">
-		<p><label for="url">URL</label> <input type="text" id="url" name="url" width="100%" margin-top="6px" margin-bottom="16px" required></p>
-		<p><label for="custom">Custom alias</label> <input type="text" id="custom" name="custom" width="100%" margin-top="6px" margin-bottom="16px"></p>
-		<input type="submit" name="send" value="Submit">
-		</form>
-		</div>
-		<div>
-		URL created: ` + link +
-		`</div>
-	  </body>
-	</html>`
 
-	fmt.Fprintf(w, content, id)
+	tmpl := template.Must(template.ParseFiles("create.html"))
+	extra := ExtraData{
+		Extra: `<label for="result">Your URL:</label>
+				<input type="text" value="` + link + `" id="result">
+				<button onclick="copyText()">Copy</button>`,
+	}
+	tmpl.Execute(w, extra)
 }
 
 func redirect(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +191,7 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 	if uri, ok := links[id]; ok {
 		http.Redirect(w, r, uri, http.StatusMovedPermanently)
 	} else {
-		fmt.Printf("URL not found in table\n")
+		fmt.Printf("ID not found in table: %s\n", id)
 		return
 	}
 }

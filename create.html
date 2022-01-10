@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://ethanvogelsang.com/static/styles.css">
   </head>
   <body>
     <h1 id="shorten-url">Shorten URL</h1>
@@ -13,5 +13,17 @@
     <input type="submit" name="send" value="Submit">
     </form>
     </div>
+    <div style="margin-top: 50px;">
+      {{.Extra}}
+    </div>
   </body>
 </html>
+
+<script>
+function copyText() {
+    let text = document.getElementById("result")
+    text.select();
+    text.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(text.value);
+  }
+</script>
