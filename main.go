@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/gob"
 	"fmt"
 	"log"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	SAVED_LINKS   = "links.gob"
+	SAVED_LINKS   = "links.csv"
 	SAVED_COUNTER = "counter.gob"
 )
 
@@ -39,11 +40,16 @@ func init() {
 		}
 		defer f.Close()
 
-		dec := gob.NewDecoder(f)
-		err = dec.Decode(&links)
+		reader := csv.NewReader(f)
+		rawLinks, err := reader.ReadAll()
 		if err != nil {
 			fmt.Printf("Could not decode links: %v", err)
 			os.Exit(1)
+		}
+
+		links = make(map[string]string)
+		for _, link := range rawLinks {
+			links[link[0]] = link[1]
 		}
 
 	} else {
@@ -58,10 +64,16 @@ func init() {
 		}
 		defer f.Close()
 
-		enc := gob.NewEncoder(f)
-		err = enc.Encode(links)
+		writer := csv.NewWriter(f)
+
+		var rawLinks [][]string
+		for key, value := range links {
+			rawLinks = append(rawLinks, []string{key, value})
+		}
+
+		err = writer.WriteAll(rawLinks)
 		if err != nil {
-			fmt.Printf("Could not encode links: %v", err)
+			fmt.Printf("Could not write links: %v", err)
 			os.Exit(1)
 		}
 	}
@@ -167,10 +179,16 @@ func create(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
-	enc := gob.NewEncoder(f)
-	err = enc.Encode(links)
+	writer := csv.NewWriter(f)
+
+	var rawLinks [][]string
+	for key, value := range links {
+		rawLinks = append(rawLinks, []string{key, value})
+	}
+
+	err = writer.WriteAll(rawLinks)
 	if err != nil {
-		fmt.Printf("Could not encode links: %v", err)
+		fmt.Printf("Could not write links: %v", err)
 		os.Exit(1)
 	}
 
