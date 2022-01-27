@@ -28,6 +28,17 @@ type ExtraData struct {
 	Extra string
 }
 
+// init logging
+func init() {
+	f, err := os.OpenFile("log.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Could not create log file: %v", err)
+		os.Exit(1)
+	}
+
+	log.SetOutput(f)
+}
+
 // check for saved links and load or create
 func init() {
 	_, err := os.Stat(SAVED_LINKS)
@@ -35,15 +46,14 @@ func init() {
 		// file already exists
 		f, err := os.Open(SAVED_LINKS)
 		if err != nil {
-			fmt.Printf("Could not open file: %v", err)
-			os.Exit(1)
+			log.Printf("Could not open file: %v", err)
 		}
 		defer f.Close()
 
 		reader := csv.NewReader(f)
 		rawLinks, err := reader.ReadAll()
 		if err != nil {
-			fmt.Printf("Could not decode links: %v", err)
+			log.Printf("Could not decode links: %v", err)
 			os.Exit(1)
 		}
 
@@ -59,7 +69,7 @@ func init() {
 		// create new file to save links to
 		f, err := os.Create(SAVED_LINKS)
 		if err != nil {
-			fmt.Printf("Could not create file: %v", err)
+			log.Printf("Could not create file: %v", err)
 			os.Exit(1)
 		}
 		defer f.Close()
@@ -73,7 +83,7 @@ func init() {
 
 		err = writer.WriteAll(rawLinks)
 		if err != nil {
-			fmt.Printf("Could not write links: %v", err)
+			log.Printf("Could not write links: %v", err)
 			os.Exit(1)
 		}
 	}
@@ -86,7 +96,7 @@ func init() {
 		// file already exists
 		f, err := os.Open(SAVED_COUNTER)
 		if err != nil {
-			fmt.Printf("Could not open file: %v", err)
+			log.Printf("Could not open file: %v", err)
 			os.Exit(1)
 		}
 		defer f.Close()
@@ -94,7 +104,7 @@ func init() {
 		dec := gob.NewDecoder(f)
 		err = dec.Decode(&counter)
 		if err != nil {
-			fmt.Printf("Could not decode counter: %v", err)
+			log.Printf("Could not decode counter: %v", err)
 			os.Exit(1)
 		}
 	}
@@ -112,7 +122,7 @@ func newID() string {
 	// save
 	f, err := os.Create(SAVED_COUNTER)
 	if err != nil {
-		fmt.Printf("Could not create file: %v", err)
+		log.Printf("Could not create file: %v", err)
 		os.Exit(1)
 	}
 	defer f.Close()
@@ -120,7 +130,7 @@ func newID() string {
 	enc := gob.NewEncoder(f)
 	err = enc.Encode(counter)
 	if err != nil {
-		fmt.Printf("Could not encode counter: %v", err)
+		log.Printf("Could not encode counter: %v", err)
 		os.Exit(1)
 	}
 
@@ -131,14 +141,17 @@ func home(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFiles("create.html"))
 	extra := ExtraData{Extra: ""}
 
-	tmpl.Execute(w, extra)
+	err := tmpl.Execute(w, extra)
+	if err != nil {
+		log.Printf("Error executing template: %v", err)
+	}
 }
 
 func create(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		fmt.Printf("Could not parse form: %v", err)
-		os.Exit(1)
+		log.Printf("Could not parse form: %v", err)
+		return
 	}
 
 	uri := r.Form.Get("url")
@@ -154,7 +167,10 @@ func create(w http.ResponseWriter, r *http.Request) {
 			Extra: `<p style="color: #d50000">Sorry, that alias is in use!<p>`,
 		}
 
-		tmpl.Execute(w, extra)
+		err = tmpl.Execute(w, extra)
+		if err != nil {
+			log.Printf("Error executing template: %v", err)
+		}
 		return
 	}
 
@@ -165,31 +181,35 @@ func create(w http.ResponseWriter, r *http.Request) {
 			Extra: `<p style="color: #d50000">That is not a valid URL!<p>`,
 		}
 
-		tmpl.Execute(w, extra)
+		err = tmpl.Execute(w, extra)
+		if err != nil {
+			log.Printf("Error executing template: %v", err)
+		}
 		return
 	}
 
 	links[id] = uri
 
 	// save links
-	f, err := os.Create(SAVED_LINKS)
+	f, err := os.OpenFile(SAVED_LINKS, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Could not create file: %v", err)
-		os.Exit(1)
+		log.Printf("Could not create file: %v", err)
+		return
 	}
 	defer f.Close()
 
 	writer := csv.NewWriter(f)
 
-	var rawLinks [][]string
-	for key, value := range links {
-		rawLinks = append(rawLinks, []string{key, value})
+	err = writer.Write([]string{id, uri})
+	if err != nil {
+		log.Printf("Could not write link: %v", err)
+		return
 	}
 
-	err = writer.WriteAll(rawLinks)
-	if err != nil {
-		fmt.Printf("Could not write links: %v", err)
-		os.Exit(1)
+	writer.Flush()
+	if writer.Error() != nil {
+		log.Printf("Could not write link: %v", err)
+		return
 	}
 
 	link := fmt.Sprintf("https://ethans.link/%s", id)
@@ -200,7 +220,10 @@ func create(w http.ResponseWriter, r *http.Request) {
 				<input type="text" value="` + link + `" id="result">
 				<button onclick="copyText()">Copy</button>`,
 	}
-	tmpl.Execute(w, extra)
+	err = tmpl.Execute(w, extra)
+	if err != nil {
+		log.Printf("Error executing template: %v", err)
+	}
 }
 
 func redirect(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +232,7 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 	if uri, ok := links[id]; ok {
 		http.Redirect(w, r, uri, http.StatusMovedPermanently)
 	} else {
-		fmt.Printf("ID not found in table: %s\n", id)
+		log.Printf("ID not found in table: %s\n", id)
 		return
 	}
 }

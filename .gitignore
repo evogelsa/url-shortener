@@ -1,2 +1,4 @@
 *.gob
 *.csv
+log.txt
+url-shortener
