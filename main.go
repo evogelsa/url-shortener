@@ -233,7 +233,7 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, uri, http.StatusMovedPermanently)
 	} else {
 		log.Printf("ID not found in table: %s\n", id)
-		return
+		http.NotFound(w, r)
 	}
 }
 
