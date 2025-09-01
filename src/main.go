@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"text/template"
 
 	"github.com/gorilla/mux"
@@ -17,11 +18,14 @@ import (
 const (
 	SAVED_LINKS   = "links.csv"
 	SAVED_COUNTER = "counter.gob"
+	API_KEY       = "token"
+	API_KEY_ENV   = "ETHANS_LINK_API_KEY"
 )
 
 var (
 	links   map[string]string
 	counter int64
+	apiKey  string
 )
 
 type ExtraData struct {
@@ -37,6 +41,23 @@ func init() {
 	}
 
 	log.SetOutput(f)
+}
+
+// load apiKey from environment variable or file
+func init() {
+	b, err := os.ReadFile(API_KEY)
+	if err == nil {
+		apiKey = strings.TrimSpace(string(b))
+		log.Printf("loaded key from file: %s", apiKey)
+	} else {
+		log.Printf("error loading key from file: %v", err)
+	}
+
+	env := os.Getenv(API_KEY_ENV)
+	if env != "" {
+		apiKey = env
+		log.Printf("loaded key from env: %s", apiKey)
+	}
 }
 
 // check for saved links and load or create
@@ -87,6 +108,10 @@ func init() {
 			os.Exit(1)
 		}
 	}
+
+	// add api to links so it cannot be used
+	links["api"] = "inuse"
+	links["api/create"] = "inuse"
 }
 
 // check for saved counter and load
@@ -226,6 +251,66 @@ func create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func createAPI(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	uri := r.URL.Query().Get("url")
+	id := r.URL.Query().Get("custom")
+
+	if key != apiKey {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("unauthorized"))
+		return
+	}
+
+	if id == "" {
+		id = newID()
+	}
+
+	if _, exists := links[id]; exists {
+		// alias in use
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("in use"))
+		return
+	}
+
+	_, err := url.ParseRequestURI(uri)
+	if err != nil {
+		// not a valid url
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("bad url"))
+		return
+	}
+
+	links[id] = uri
+
+	// save links
+	f, err := os.OpenFile(SAVED_LINKS, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("Could not create file: %v", err)
+		return
+	}
+	defer f.Close()
+
+	writer := csv.NewWriter(f)
+
+	err = writer.Write([]string{id, uri})
+	if err != nil {
+		log.Printf("Could not write link: %v", err)
+		return
+	}
+
+	writer.Flush()
+	if writer.Error() != nil {
+		log.Printf("Could not write link: %v", err)
+		return
+	}
+
+	link := fmt.Sprintf("https://ethans.link/%s", id)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(link))
+}
+
 func redirect(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -241,6 +326,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/", home).Methods("GET")
 	router.HandleFunc("/", create).Methods("POST")
+	router.HandleFunc("/api/create", createAPI).Methods("POST")
 	router.HandleFunc("/{id}", redirect).Methods("GET")
 
 	log.Fatal(http.ListenAndServe(":8085", router))
